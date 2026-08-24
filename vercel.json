@@ -1,0 +1,7 @@
+{
+  "functions": {
+    "api/analisar-conta.ts": {
+      "maxDuration": 30
+    }
+  }
+}
