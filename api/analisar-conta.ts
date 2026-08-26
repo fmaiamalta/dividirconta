@@ -50,7 +50,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     const resposta = await anthropic.messages.create({
-      model: 'claude-sonnet-4-6',
+      model: 'claude-sonnet-5',
       max_tokens: 2000,
       system: PROMPT_SISTEMA,
       messages: [
@@ -91,6 +91,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.status(200).json(dados);
   } catch (erro) {
     console.error('Erro ao analisar conta:', erro);
-    res.status(500).json({ erro: 'Falha ao analisar a conta' });
+    const detalhes = erro instanceof Error ? erro.message : String(erro);
+    res.status(500).json({ erro: 'Falha ao analisar a conta', detalhes });
   }
 }

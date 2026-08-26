@@ -3,10 +3,13 @@
   "version": "1.0.0",
   "private": true,
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.32.0"
+    "@anthropic-ai/sdk": "^0.32.0",
+    "expo-image-manipulator": "~57.0.13",
+    "expo-image-picker": "~57.0.13"
   },
   "devDependencies": {
+    "@types/react": "~19.2.4",
     "@vercel/node": "^3.0.0",
-    "typescript": "^5.0.0"
+    "typescript": "~6.0.3"
   }
 }
