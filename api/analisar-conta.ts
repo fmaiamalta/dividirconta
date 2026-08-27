@@ -6,7 +6,17 @@ const anthropic = new Anthropic({
 });
 
 const PROMPT_SISTEMA = `Analisas fotos de contas/talões (restaurante, café, bilheteira, etc.)
-e devolves APENAS um JSON válido, sem texto à volta, sem markdown, com esta forma exata:
+e devolves APENAS um JSON válido, sem texto à volta, sem markdown.
+
+Primeiro verifica se a imagem é mesmo uma conta, talão, fatura ou recibo legível,
+com itens e preços visíveis. Se NÃO for (por exemplo: é outra coisa qualquer sem
+relação com uma conta, está demasiado desfocada ou escura para ler os valores, ou
+está cortada de forma a não mostrar itens com preços), devolve APENAS isto, sem
+mais nenhum campo:
+
+{ "erro": "Esta foto não parece ser uma conta ou fatura legível. Tira outra foto, bem enquadrada e com boa luz." }
+
+Se for uma conta legível, devolve esta forma exata:
 
 {
   "tipoDocumento": "restaurante" | "bilheteira" | "outro",
@@ -22,7 +32,9 @@ Regras:
   água, refrigerantes e café são "bebida"; qualquer outra coisa (taxas, bilhetes, entradas
   de eventos) é "outro".
 - Se não conseguires ler algum valor com confiança, não inventes: omite esse item.
-- Ignora subtotais, totais e cabeçalhos — só itens reais consumidos ou comprados.`;
+- Ignora subtotais, totais e cabeçalhos — só itens reais consumidos ou comprados.
+- Se depois de ignorar subtotais e cabeçalhos não sobrar nenhum item legível,
+  devolve o erro descrito acima, em vez de um array vazio.`;
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Permite chamadas a partir da app (React Native não é bloqueado por CORS,
