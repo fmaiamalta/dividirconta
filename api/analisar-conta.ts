@@ -60,9 +60,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return;
   }
 
-  // A conta pode chegar como foto (image/jpeg, image/png) ou como PDF
-  // digitalizado (application/pdf) — a Claude precisa de um tipo de bloco
-  // diferente para cada caso.
+  const TIPOS_ACEITES = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
+  if (!TIPOS_ACEITES.includes(mediaType)) {
+    res.status(400).json({ erro: `mediaType não suportado: ${mediaType}` });
+    return;
+  }
+
+  // A conta pode chegar como foto (image/jpeg, image/png, image/webp) ou
+  // como PDF digitalizado (application/pdf) — a Claude precisa de um tipo
+  // de bloco diferente para cada caso.
   const blocoConta =
     mediaType === 'application/pdf'
       ? ({
@@ -74,8 +80,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           source: { type: 'base64', media_type: mediaType, data: imagemBase64 },
         } as const);
 
+  let resposta;
   try {
-    const resposta = await anthropic.messages.create({
+    resposta = await anthropic.messages.create({
       model: 'claude-sonnet-5',
       // 2000 era baixo demais para contas com muitos itens (ex: talão de
       // supermercado) — a resposta ficava cortada a meio do JSON e o
@@ -95,35 +102,45 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         },
       ],
     });
+  } catch (erro) {
+    // Erro vindo do SDK/rede (auth, rate limit, etc.) — fica só no log do
+    // servidor. Não vale a pena devolver o texto cru ao cliente, pode ter
+    // detalhes internos do pedido que não lhe dizem respeito.
+    console.error('Erro ao chamar a Anthropic:', erro);
+    res.status(502).json({ erro: 'Não foi possível contactar o serviço de análise.' });
+    return;
+  }
 
-    const blocoTexto = resposta.content.find((c) => c.type === 'text');
-    if (!blocoTexto || blocoTexto.type !== 'text') {
-      res.status(502).json({ erro: 'A IA não devolveu texto' });
-      return;
-    }
+  const blocoTexto = resposta.content.find((c) => c.type === 'text');
+  if (!blocoTexto || blocoTexto.type !== 'text') {
+    res.status(502).json({ erro: 'A IA não devolveu texto' });
+    return;
+  }
 
-    // Se a resposta foi cortada por atingir o limite de tokens, o JSON vai
-    // estar sempre incompleto — não vale a pena tentar fazer parse, é
-    // melhor dar já um erro claro em vez do erro cru do JSON.parse.
-    if (resposta.stop_reason === 'max_tokens') {
-      res.status(502).json({
-        erro: 'Esta conta tem itens a mais para analisar de uma vez.',
-        detalhes: 'Tenta tirar duas fotos, dividindo a conta em duas partes.',
-      });
-      return;
-    }
+  // Se a resposta foi cortada por atingir o limite de tokens, o JSON vai
+  // estar sempre incompleto — não vale a pena tentar fazer parse, é
+  // melhor dar já um erro claro em vez do erro cru do JSON.parse.
+  if (resposta.stop_reason === 'max_tokens') {
+    res.status(502).json({
+      erro: 'Esta conta tem itens a mais para analisar de uma vez.',
+      detalhes: 'Tenta tirar duas fotos, dividindo a conta em duas partes.',
+    });
+    return;
+  }
 
-    const textoLimpo = blocoTexto.text
-      .trim()
-      .replace(/^```json\s*/i, '')
-      .replace(/^```\s*/i, '')
-      .replace(/```\s*$/i, '');
+  const textoLimpo = blocoTexto.text
+    .trim()
+    .replace(/^```json\s*/i, '')
+    .replace(/^```\s*/i, '')
+    .replace(/```\s*$/i, '');
 
+  try {
     const dados = JSON.parse(textoLimpo);
-
     res.status(200).json(dados);
   } catch (erro) {
-    console.error('Erro ao analisar conta:', erro);
+    // Este é um erro nosso (o prompt pode precisar de ajuste), não do
+    // utilizador — os detalhes ajudam a perceber o que aconteceu.
+    console.error('Erro ao interpretar a resposta da IA:', erro);
     const detalhes = erro instanceof Error ? erro.message : String(erro);
     res.status(500).json({ erro: 'Falha ao analisar a conta', detalhes });
   }
