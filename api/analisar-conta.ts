@@ -63,7 +63,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     const resposta = await anthropic.messages.create({
       model: 'claude-sonnet-5',
-      max_tokens: 2000,
+      // 2000 era baixo demais para contas com muitos itens (ex: talão de
+      // supermercado) — a resposta ficava cortada a meio do JSON e o
+      // JSON.parse abaixo falhava com "Unterminated string in JSON".
+      max_tokens: 8192,
       system: PROMPT_SISTEMA,
       messages: [
         {
@@ -89,6 +92,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const blocoTexto = resposta.content.find((c) => c.type === 'text');
     if (!blocoTexto || blocoTexto.type !== 'text') {
       res.status(502).json({ erro: 'A IA não devolveu texto' });
+      return;
+    }
+
+    // Se a resposta foi cortada por atingir o limite de tokens, o JSON vai
+    // estar sempre incompleto — não vale a pena tentar fazer parse, é
+    // melhor dar já um erro claro em vez do erro cru do JSON.parse.
+    if (resposta.stop_reason === 'max_tokens') {
+      res.status(502).json({
+        erro: 'Esta conta tem itens a mais para analisar de uma vez.',
+        detalhes: 'Tenta tirar duas fotos, dividindo a conta em duas partes.',
+      });
       return;
     }
 
