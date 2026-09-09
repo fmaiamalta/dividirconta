@@ -60,6 +60,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return;
   }
 
+  // A conta pode chegar como foto (image/jpeg, image/png) ou como PDF
+  // digitalizado (application/pdf) — a Claude precisa de um tipo de bloco
+  // diferente para cada caso.
+  const blocoConta =
+    mediaType === 'application/pdf'
+      ? ({
+          type: 'document',
+          source: { type: 'base64', media_type: 'application/pdf', data: imagemBase64 },
+        } as const)
+      : ({
+          type: 'image',
+          source: { type: 'base64', media_type: mediaType, data: imagemBase64 },
+        } as const);
+
   try {
     const resposta = await anthropic.messages.create({
       model: 'claude-sonnet-5',
@@ -72,14 +86,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         {
           role: 'user',
           content: [
-            {
-              type: 'image',
-              source: {
-                type: 'base64',
-                media_type: mediaType,
-                data: imagemBase64,
-              },
-            },
+            blocoConta,
             {
               type: 'text',
               text: 'Extrai os itens desta conta, seguindo exatamente o formato indicado.',

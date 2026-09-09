@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.32.0",
+    "@anthropic-ai/sdk": "^0.124.0",
     "expo-image-manipulator": "~57.0.13",
     "expo-image-picker": "~57.0.13"
   },
